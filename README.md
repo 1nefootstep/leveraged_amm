@@ -44,9 +44,10 @@ To run the tests:
 ```bash
 brownie test
 ```
-You will need to either have the .env file ready or remove the lines to stop brownie from complaining if you just want to run the unit tests right away.
+You will need to either have the .env file ready or remove these lines to stop brownie from complaining if you just want to run the unit tests right away.
 
 ```
+REMOVE THESE FROM brownie-config.yaml IF YOU WANT TO RUN THE UNIT TESTS RIGHT AWAY WITHOUT PROVIDING PRIVATE KEY ON .env
 wallets:
   from_key: ${PRIVATE_KEY}
 ```
