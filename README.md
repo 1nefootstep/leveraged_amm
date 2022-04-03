@@ -44,6 +44,12 @@ To run the tests:
 ```bash
 brownie test
 ```
+You will need to either have the .env file ready or remove the lines to stop brownie from complaining if you just want to run the unit tests right away.
+
+```
+wallets:
+  from_key: ${PRIVATE_KEY}
+```
 
 ## Testing the module
 
