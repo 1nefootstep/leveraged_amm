@@ -1,5 +1,5 @@
-# built from/with
-This leveraged amm was built for the following instruction:
+# User story/rationale
+This leveraged AMM was built with the following scenario:
 ```
 ### Leveraged AMM exchange module
 
@@ -29,50 +29,15 @@ An exchange has a ETH/USDC AMM leverage trading pool and the max leverage is 10x
 - Alice’s current leverage is 10x, which is already the default max leverage, so she cannot get anymore ETH position; selling ETH is possible though
 ```
 
+## Built with
+Brownie's token template and ![constant product amm example](https://solidity-by-example.org/defi/constant-product-amm/) from solidity-by-example.
+
 ## Installation
 
-1. [Install Brownie](https://eth-brownie.readthedocs.io/en/stable/install.html), if you haven't already.
+1. [Install Brownie](https://eth-brownie.readthedocs.io/en/stable/install.html)
 
 
-## Basic Use
-
-This mix provides a [simple template](contracts/Token.sol) upon which you can build your own token, as well as unit tests providing 100% coverage for core ERC20 functionality.
-
-To interact with a deployed contract in a local environment, start by opening the console:
-
-```bash
-brownie console
-```
-
-Next, deploy a test token:
-
-```python
->>> token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
-
-Transaction sent: 0x4a61edfaaa8ba55573603abd35403cf41291eca443c983f85de06e0b119da377
-  Gas price: 0.0 gwei   Gas limit: 12000000
-  Token.constructor confirmed - Block: 1   Gas used: 521513 (4.35%)
-  Token deployed at: 0xd495633B90a237de510B4375c442C0469D3C161C
-```
-
-You now have a token contract deployed, with a balance of `1e21` assigned to `accounts[0]`:
-
-```python
->>> token
-<Token Contract '0xd495633B90a237de510B4375c442C0469D3C161C'>
-
->>> token.balanceOf(accounts[0])
-1000000000000000000000
-
->>> token.transfer(accounts[1], 1e18, {'from': accounts[0]})
-Transaction sent: 0xb94b219148501a269020158320d543946a4e7b9fac294b17164252a13dce9534
-  Gas price: 0.0 gwei   Gas limit: 12000000
-  Token.transfer confirmed - Block: 2   Gas used: 51668 (0.43%)
-
-<Transaction '0xb94b219148501a269020158320d543946a4e7b9fac294b17164252a13dce9534'>
-```
-
-## Testing
+## Unit Testing
 
 To run the tests:
 
@@ -80,18 +45,73 @@ To run the tests:
 brownie test
 ```
 
-The unit tests included in this mix are very generic and should work with any ERC20 compliant smart contract. To use them in your own project, all you must do is modify the deployment logic in the [`tests/conftest.py::token`](tests/conftest.py) fixture.
+## Testing the module
 
-## Resources
+Setting up .env and the blockchain network:
+For example, if testing on a local ganache, add the network to brownie with,
+```bash
+brownie networks add <MY_NETWORK_NAME> host=<NETWORK_ID_ON_GANACHE> chainid=1337
+```
+Then copy the private key of the account that would do most of the functionalities.
+Make a .env file and put this inside
+```bash
+export PRIVATE_KEY=<MY_PRIVATE_KEY>
+```
 
-To get started with Brownie:
+### Deploying
+First deploy the contracts with:
 
-* Check out the other [Brownie mixes](https://github.com/brownie-mix/) that can be used as a starting point for your own contracts. They also provide example code to help you get started.
-* ["Getting Started with Brownie"](https://medium.com/@iamdefinitelyahuman/getting-started-with-brownie-part-1-9b2181f4cb99) is a good tutorial to help you familiarize yourself with Brownie.
-* For more in-depth information, read the [Brownie documentation](https://eth-brownie.readthedocs.io/en/stable/).
+```bash
+brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/deploy.py
+```
+The parameters can be adjust accordingly... For example, the following creates the erc20 token named USD Coin, ticker USDC, 18 decimal places, and with initial supply of 1e21.
+```python
+usdc_addr = deploy_token("USD Coin", "USDC", 18, 1e21)
+```
+And for the amm, the first two arguments are the addresses of the tokens in the amm pool.
+The third argument is the erc20 token that will be the collateral. Finally, the last argument is
+the max leverage. The max leverage argument is multiplied by 1000, so if you want 10x leverage, 10000 is the argument.
+```python
+amm_addr = deploy_amm(weth_addr, usdc_addr, usdc_addr, 10000)
+```
 
+### Adding liquidity
+Then add liquidity to the amm with:
+```bash
+brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/add_liquidity.py
+```
+The parameters like how many tokens to add for both sides of the pool can be configured within the add_liquidity.py script.
 
-Any questions? Join our [Gitter](https://gitter.im/eth-brownie/community) channel to chat and share with others in the community.
+### Other functions
+After adding liquidity, you can add collateral.
+```bash
+brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/depositCollateral.py
+```
+And then create positions,
+```bash
+brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/createPosition.py
+```
+You can withdraw collateral, close positions with the following:
+
+```bash
+brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/withdrawCollateral.py
+brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/closePosition.py
+```
+
+There are also the view functions to simulate the position size.
+```bash
+brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/simulatePosition.py
+```
+and to check collateral necessary to create a position of some size
+```bash
+brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/calcCollateralNeeded.py
+```
+
+## Limitations
+This is not a true leveraged AMM because the positions do not lose/gain any tokens. It seems difficult/complex to guarantee that the AMM pool won't be depleted (that LP providers don't get rugged) if we somehow allow the positions to actually do trades on the AMM. Based on my understanding that this is a 1-3hr assignment, I don't think it's possible within the timeframe? Though I spent way more time than I should have on this already... signing out :(
+
+## Actual code written
+Actual code written is the LevCPAMM.sol contract, CPAMM unit tests and LevCPAMM unit tests.
 
 ## License
 
