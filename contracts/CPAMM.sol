@@ -33,7 +33,7 @@ contract CPAMM {
         totalSupply -= _amount;
     }
 
-    function _update(uint _reserve0, uint _reserve1) private {
+    function _update(uint _reserve0, uint _reserve1) internal {
         reserve0 = _reserve0;
         reserve1 = _reserve1;
     }
