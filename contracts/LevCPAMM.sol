@@ -6,20 +6,13 @@ import "./CPAMM.sol";
 struct Position {
     uint256 otherTokenAmount; // in other token
     uint256 collateralValue; // in collateraltoken
-    int256 pnl; // 0
-    // usdc you sell - usdc you buy (collateral value)
-    // bool isActive;
 }
 
 contract LevCPAMM is CPAMM {
     uint32 public maxLeverage;
-    // uint256 public constant ratio =
     uint16 public constant leverageRatio = 1000; // to add dp to maxLeverage
     IERC20 public collateralToken;
-    mapping(address => uint256) public positionValueOf;
-    mapping(address => mapping(uint256 => Position)) public userPositions;
     mapping(address => Position) public _userPositions;
-    mapping(address => uint256) public lastPositionIndexOf;
     mapping(address => uint256) public collateralOf;
 
     constructor(
@@ -65,7 +58,7 @@ contract LevCPAMM is CPAMM {
 
     function remainingPositionOf(address _user) public view returns (uint256) {
         uint256 userMaxLeverage = maxLeverageOf(_user);
-        uint256 userCurrLeverage = positionValueOf[_user];
+        uint256 userCurrLeverage = _userPositions[_user].collateralValue;
         return userMaxLeverage - userCurrLeverage;
     }
 
@@ -98,7 +91,7 @@ contract LevCPAMM is CPAMM {
 
     function removeCollateral(uint256 _amount) external {
         require(collateralOf[msg.sender] >= _amount, "insufficient collateral");
-        uint256 positionValue = positionValueOf[msg.sender];
+        uint256 positionValue = _userPositions[msg.sender].collateralValue;
         uint256 maxPositionInCollateralTokenAfter = ((collateralOf[msg.sender] -
             _amount) * maxLeverage) / leverageRatio;
         require(
@@ -110,91 +103,59 @@ contract LevCPAMM is CPAMM {
         collateralToken.transfer(msg.sender, _amount);
     }
 
-    function _levSwap(address _tokenIn, uint _amountIn) internal returns (uint amountOut) {
-        require(
-            _tokenIn == address(token0) || _tokenIn == address(token1),
-            "invalid token"
-        );
-
+    function _levSwap(address _tokenIn, uint256 _amountIn)
+        internal
+        returns (uint256 amountOut)
+    {
+        // this require unnecessary because fn is not external
+        // require(
+        //     _tokenIn == address(token0) || _tokenIn == address(token1),
+        //     "invalid token"
+        // );
         bool isToken0 = _tokenIn == address(token0);
 
-        (uint reserveIn, uint reserveOut) = isToken0
+        (uint256 reserveIn, uint256 reserveOut) = isToken0
             ? (reserve0, reserve1)
             : (reserve1, reserve0);
 
-        // tokenIn.transferFrom(msg.sender, address(this), _amountIn);
-        // uint amountIn = tokenIn.balanceOf(address(this)) - reserveIn;
-
-        /*
-        How much dy for dx?
-
-        xy = k
-        (x + dx)(y - dy) = k
-        y - dy = k / (x + dx)
-        y - k / (x + dx) = dy
-        y - xy / (x + dx) = dy
-        (yx + ydx - xy) / (x + dx) = dy
-        ydx / (x + dx) = dy
-        */
-        // 0.3% fee
-        // uint amountInWithFee = (amountIn * 997) / 1000;
-        // amountOut = (reserveOut * amountInWithFee) / (reserveIn + amountInWithFee);
         amountOut = (reserveOut * _amountIn) / (reserveIn + _amountIn);
 
-        (uint res0, uint res1) = isToken0
+        (uint256 res0, uint256 res1) = isToken0
             ? (reserveIn + _amountIn, reserveOut - amountOut)
             : (reserveOut - amountOut, reserveIn + _amountIn);
 
         _update(res0, res1);
-        // tokenOut.transfer(msg.sender, amountOut);
     }
 
-    function addPosition(uint256 _amountInOtherPair) external {
-        // 1 ETH = $500
-        // coll = $1000
-        // 10 ETH = $5000 -> $6000
-        // 5000 -> 0
-        // pnl 1000
-        // want to buy 10 eth which needs 
-        // want to buy 10 eth which needs $5000    
-        uint256 positionToAddInCollateralToken = _otherPairToCollateralToken(
-           _amountInOtherPair
-        );
+    function addPosition(uint256 _amountInCollateralToken) external {
         require(
-            remainingPositionOf(msg.sender) >= positionToAddInCollateralToken,
+            remainingPositionOf(msg.sender) >= _amountInCollateralToken,
             "exceeds max leverage"
         );
-
-        _userPositions[msg.sender].collateralValue += positionToAddInCollateralToken;
-        _userPositions[msg.sender].otherTokenAmount += _amountInOtherPair;
-        // _userPositions[msg.sender] += Position(
-        //     _amountInOtherPair,
-        //     positionToAddInCollateralToken
-        // );
-        _levSwap(address(collateralToken), positionToAddInCollateralToken);
-        // lastPositionIndexOf[msg.sender] += 1;
-        positionValueOf[msg.sender] += positionToAddInCollateralToken;
+        _userPositions[msg.sender].collateralValue += _amountInCollateralToken;
+        _userPositions[msg.sender].otherTokenAmount += _levSwap(
+            address(collateralToken),
+            _amountInCollateralToken
+        );
     }
 
     function decreasePosition(uint256 _amountInOtherPair) external {
-    // function closePosition(uint256 idx) external {
         require(
-            _userPositions[msg.sender].otherTokenAmount - _amountInOtherPair >= 0,
+            _userPositions[msg.sender].otherTokenAmount >= _amountInOtherPair,
             "position cannot be negative"
         );
-        
         IERC20 _otherToken = collateralToken == token0 ? token1 : token0;
-        uint256 _amount_out = _levSwap(address(_otherToken), _amountInOtherPair);
+        uint256 _collateralValue = _userPositions[msg.sender].collateralValue;
+        uint256 amountOut = _levSwap(address(_otherToken), _amountInOtherPair);
         _userPositions[msg.sender].otherTokenAmount -= _amountInOtherPair;
-
-        // 3000 - 5000 = -2000
-        // 5 * 1000 / 10
-        uint256 closeRatio = _amountInOtherPair * 1000 / _userPositions[msg.sender].otherTokenAmount;
-        int256 pnl = _amount_out - _userPositions[msg.sender].collateralValue;
-        _userPositions[msg.sender].collateralValue -= _amountInOtherPair;
-
-        positionValueOf[msg.sender] -= _userPositions[msg.sender]
-            .collateralValue;
-        // TODO?: somehow settle profits/loss from this position
+        if (_collateralValue > amountOut) {
+            _userPositions[msg.sender].collateralValue =
+                _collateralValue -
+                amountOut;
+        } else {
+            _userPositions[msg.sender].collateralValue = 0;
+            // add profit to collateralValue
+            collateralOf[msg.sender] += amountOut - _collateralValue;
+        }
     }
 }
