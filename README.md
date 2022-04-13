@@ -118,7 +118,7 @@ brownie run --network <YOUR_BLOCKCHAIN_NETWORK> scripts/calcCollateralNeeded.py
 ```
 
 ## Limitations
-This is not a true leveraged AMM because the positions do not lose/gain any tokens. It seems difficult/complex to guarantee that the AMM pool won't be depleted (that LP providers don't get rugged) if we somehow allow the positions to actually do trades on the AMM. Based on my understanding that this is a 1-3hr assignment, I don't think it's possible within the timeframe? Though I spent way more time than I should have on this already... signing out :(
+No forced liquidations, so the amm can get rugged.
 
 ## Actual code written
 Actual code written is the LevCPAMM.sol contract, CPAMM unit tests and LevCPAMM unit tests.
